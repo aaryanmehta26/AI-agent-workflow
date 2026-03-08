@@ -1,40 +1,60 @@
 import os
+import json
 
 # Run "uv sync" to install the below packages
-import requests
+
 from dotenv import load_dotenv
+from openai import OpenAI
 
 load_dotenv()
+
+client = OpenAI()
 
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 
 def generate_post(topic: str) -> str:
-    # call AI (LLM) to generate a post based on the topic
+    with open("post-examples.json", "r") as f:
+        examples = json.load(f)
 
-    # prompt engineering: crafting a prompt to get the desired output from the LLM
-    prompt = f""" 
+    examples_str = ""
+    for i, example in enumerate(examples, 1):
+        examples_str += f"""
+        <example-{i}>
+            <topic>
+            {example['topic']}
+            </topic>
 
- You are an expert social media manager and content creator and you excel at crafting engaging and original social media posts for X (formerly Twitter).
+            <generated-post>
+            {example['post']}
+            </generated-post>
+        </example-{i}>
+        """
 
- Your task is to create a compelling and engaging social media post based on the following topic: "{topic}". 
- The post should be concise, attention-grabbing, and tailored for a general audience. 
+    prompt = f"""
+        You are an expert social media manager, and you excel at crafting viral and highly engaging posts for X (formerly Twitter).
 
- Please ensure that the content is original and does not contain any sensitive or inappropriate material.
+        Your task is to generate a post that is concise, impactful, and tailored to the topic provided by the user.
+        Avoid using hashtags and lots of emojis (a few emojis are okay, but not too many).
+
+        Keep the post short and focused, structure it in a clean, readable way, using line breaks and empty lines to enhance readability.
+
+        Here's the topic provided by the user for which you need to generate a post:
+        <topic>
+        {topic}
+        </topic>
+
+        Here are some examples of topics and generated posts:
+        <examples>
+            {examples_str}
+        </examples>
+
+        Please use the tone, language, structure , and style of the examples provided above to generate a post that is engaging and relevant to the topic provided by the user.
+        Don't use the content from the examples!
 """
+    response = client.responses.create(model="gpt-4.1-nano", input=prompt)
 
-    payload = {
-        "model": "gpt-4.1-nano",
-        "input": prompt,
-    }
-
-    print("Generating post...")
-    response = requests.post("https://api.openai.com/v1/responses",
-                             json=payload, headers={
-                                 "Content-Type": "application/json",
-                                 "Authorization": f"Bearer {OPENAI_API_KEY}"
-                             })
-    return response.json().get("output", [{}])[0].get("content", [{}])[0].get("text", "")
+    return response.output_text
 
 
 def main():
